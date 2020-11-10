@@ -158,10 +158,13 @@ namespace HMI.Model.Module.Services
         Int32 CountdownToSave = 0;
         object locker = new object();
         RdPositionsStatus RPS = new RdPositionsStatus();
-        Dictionary<int, bool> Availability = new Dictionary<int, bool>();
+        Dictionary<string, bool> Availability = new Dictionary<string, bool>();
 
         bool EventInit = false;
         bool EventPos = false;
+
+        int CurrentConfigHasCode = default(int);
+        bool InitWindow = false;
 
 #if _RDPAGESTIMING_
         private Task RdPageChangeDeallocationTask = null;
@@ -213,11 +216,44 @@ namespace HMI.Model.Module.Services
         [EventSubscription(EventTopicNames.RdInfoEngine, ThreadOption.UserInterface)]
         public void OnRdInfoEngine(object sender, RangeMsg<RdInfo> msg)
         {
-            Log.Trace("Processing Event {0}", EventTopicNames.RdInfoEngine, msg);
+            var configData = msg.Info.ToList().Select(i => new { i.Dst, i.Alias });
+            var newConfig = Newtonsoft.Json.JsonConvert.SerializeObject(configData);
+            var newConfigHashCode = newConfig.GetHashCode();
+            Log.Trace("Processing Event {0} Config Hash Code {1}", EventTopicNames.RdInfoEngine, newConfigHashCode);
 
-            /** AGL. Notifica los cambios de configuracion. */
+            //if (newConfigHashCode != CurrentConfigHasCode)
+            //{
+            //    CurrentConfigHasCode = newConfigHashCode;
+            //    /** AGL. Notifica los cambios de configuracion. */
+            //    EventInit = true;
+            //    Init();
+            //    Log.Trace($"Cambio de Configuracion recibida...");
+            //}
+            //else
+            //{
+            //    Log.Trace($"Configuracion Identica recibida. Arrancando Ventana de Inicializacion");
+            //    InitWindow = true;
+            //    Task.Factory.StartNew(() =>
+            //    {
+            //        Task.Delay(TimeSpan.FromMilliseconds(150)).Wait();
+            //        InitWindow = false;
+            //        Log.Trace($"Ventana de Inicializacion cerrada por tiempo.");
+            //    });
+            //}
             EventInit = true;
             Init();
+            InitWindow = true;
+            Task.Factory.StartNew(() =>
+            {
+                Task.Delay(TimeSpan.FromMilliseconds(150)).Wait();
+                InitWindow = false;
+                Log.Trace($"Ventana de Inicializacion cerrada por tiempo.");
+            });
+#if DEBUG
+            var path = $"logs\\{DateTime.Now.ToString("yyyyMMdd_HHmmss")}_ReceivedConfig.json";
+            System.IO.File.WriteAllText(path,
+                              Newtonsoft.Json.JsonConvert.SerializeObject(configData, Newtonsoft.Json.Formatting.Indented));
+#endif
         }
         /// <summary>
         /// 
@@ -230,6 +266,12 @@ namespace HMI.Model.Module.Services
             Log.Trace("(2) Processing Event {0}: {1}", EventTopicNames.RdPosStateEngine, msg);
             EventPos = true;
 
+            //if (InitWindow == true)
+            //{
+            //    InitWindow = false;
+            //    Init();
+            //    Log.Trace($"Ventana de Inicializacion cerrada por Evento.");
+            //}
             /** AGL. Notifica cambios de estadp en posiciones radio, Tx, Tx, Ptt, sqh, ... */
             int pos = msg.From;
             msg.Info.ToList().ForEach(item =>
@@ -290,12 +332,12 @@ namespace HMI.Model.Module.Services
             General.SafeLaunchEvent(RdPageEngine, this,
                 new PageMsg(e.NewPage, Properties.Settings.Default.RdPageChangeDeallocationDelay));
         }
-#endif        
-        #endregion CONSTRUCTOR y EVENTOS SUBSCRITOS
+#endif
+#endregion CONSTRUCTOR y EVENTOS SUBSCRITOS
 
-        #region METODOS PRIVADOS
+#region METODOS PRIVADOS
 
-        #region ESTADOS TX-RX
+#region ESTADOS TX-RX
 
         /// <summary>
         /// Gestiona un evento de Asignacion / Desasignacion.
@@ -312,6 +354,11 @@ namespace HMI.Model.Module.Services
             if (assignEvent == true)
             {
                 RdDst onlinepos = StateManager.Radio[pos];
+
+                if (InitWindow == true)
+                {
+                    Availability[onlinepos.Frecuency] = false;
+                }
 
                 Log.Trace("EventOnPos {0} (Frec={1}): Tx=>{2}, Rx=>{3}, Ad=>{4}, Available=>{5}, Restored=>{6}",
                     pos, onlinepos.Frecuency, onlinepos.Tx, onlinepos.Rx, onlinepos.AudioVia, !onlinepos.Unavailable,
@@ -363,7 +410,7 @@ namespace HMI.Model.Module.Services
                 //}
                 RPS.PageSize = StateManager.Radio.PageSize;
 
-                Availability = new Dictionary<int, bool>();
+                //Availability = new Dictionary<string, bool>();
 
                 if (!RdStatusRecoveryWithoutPersistence)
                 {
@@ -403,6 +450,7 @@ namespace HMI.Model.Module.Services
                 }
             }
         }
+
         /// <summary>
         /// 
         /// </summary>
@@ -534,15 +582,15 @@ namespace HMI.Model.Module.Services
         /// <returns></returns>
         bool OffOnTransition(RdDst onlinepos)
         {
-            bool lastAvailable = Availability.ContainsKey(onlinepos.Id) ? Availability[onlinepos.Id] : false;
+            bool lastAvailable = Availability.ContainsKey(onlinepos.Frecuency) ? Availability[onlinepos.Frecuency] : false;
             bool currAvailable = onlinepos.Unavailable == false;
-            Availability[onlinepos.Id] = currAvailable;
+            Availability[onlinepos.Frecuency] = currAvailable;
             return (lastAvailable == false && currAvailable == true);
         }
 
-        #endregion
+#endregion
 
-        #region ESTADOS RTX
+#region ESTADOS RTX
         /// <summary>
         /// 
         /// </summary>
@@ -611,7 +659,7 @@ namespace HMI.Model.Module.Services
                 });
             }
         }
-        #endregion
+#endregion
         /// <summary>
         /// 
         /// </summary>
@@ -637,7 +685,7 @@ namespace HMI.Model.Module.Services
         }
 
 #if _RDPAGESTIMING_
-        #region DELAYED RDPAGES CHANGES
+#region DELAYED RDPAGES CHANGES
         void DelayRdPageChange(PageSetMsg e)
         {
             RdPageChangeDeallocationTimer = Properties.Settings.Default.RdPageChangeDeallocationDelay;
@@ -668,7 +716,7 @@ namespace HMI.Model.Module.Services
                 });
             }
         }
-        #endregion
+#endregion
 #endif
         /// <summary>
         /// 
@@ -686,9 +734,9 @@ namespace HMI.Model.Module.Services
 
         Logger Log { get => LogManager.GetLogger("RSFService"); }
 
-        #endregion METODOS PRIVADOS
+#endregion METODOS PRIVADOS
 
-        #region SUPERVISION ERRORES EN TX RADIO
+#region SUPERVISION ERRORES EN TX RADIO
 
         /** 20180205. AGl. Control de los Grupos RTX */
         [EventSubscription(EventTopicNames.PttOnChanged, ThreadOption.Publisher)]
@@ -1114,7 +1162,7 @@ namespace HMI.Model.Module.Services
         }
 
         protected TxInProgressControl txInProgressControl = null;
-        #endregion
+#endregion
 
     }
 }

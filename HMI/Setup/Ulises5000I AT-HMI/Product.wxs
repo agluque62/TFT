@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:netfx="http://schemas.microsoft.com/wix/NetFxExtension" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
-  <Product Id="*" Name="Ulises5000I Audio Terminal HMI" Language="1033" Version="2.5.9" Manufacturer="DF Nucleo" UpgradeCode="{6B02D6AF-FF68-4806-8D24-D5F42D78698F}">
+  <Product Id="*" Name="Ulises5000I Audio Terminal HMI" Language="1033" Version="2.6.0" Manufacturer="NucleoCC" UpgradeCode="{6B02D6AF-FF68-4806-8D24-D5F42D78698F}">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" InstallPrivileges="elevated"/>
 
     <PropertyRef Id="NETFRAMEWORK45"/>
@@ -129,7 +129,7 @@
     </Property>
 
     <!-- Recuperacion de estados radio  -->
-    <Property Id="RDSTATUSREC" Value="20">
+    <Property Id="RDSTATUSREC" Value="2">
       <RegistrySearch Id='UV5KI_HMI_RDSTATUSREC' Root='HKLM'
                      Key='SOFTWARE\Wix\UV5KI_HMI'
                      Name='RDSTATUSREC_Property' Type='raw' />
@@ -343,6 +343,11 @@
                         File = "[#HMI.config]"
                         ElementPath="/configuration/applicationSettings/HMI.Model.Module.Properties.Settings/setting[\[]@name='RdSquelchConfirmationTime'[\]]/value"
                         Value="[TIMESPRX]"/>
+        <!--  -->
+        <util:XmlFile Id="LcMemNotifSgProperty" Action="setValue"
+                        File = "[#HMI.config]"
+                        ElementPath="/configuration/applicationSettings/HMI.Model.Module.Properties.Settings/setting[\[]@name='LcMemNotifSg'[\]]/value"
+                        Value="0"/>
         <!--  -->
         <util:XmlFile Id="CwpPttFilterProperty" Action="setValue"
                         File = "[#HMI.config]"
@@ -1300,9 +1305,10 @@
           <ComboBox Property="RDSTATUSREC">
             <ListItem Value="0"  Text="No" />
             <ListItem Value="1"  Text="Sin Persistencia" />
+            <ListItem Value="2" Text="2 seg." />
+            <ListItem Value="5" Text="5 seg." />
             <ListItem Value="10" Text="10 seg." />
             <ListItem Value="20" Text="20 seg." />
-            <ListItem Value="30" Text="30 seg." />
           </ComboBox>
         </Control>
 

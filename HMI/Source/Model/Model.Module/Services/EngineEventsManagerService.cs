@@ -12,7 +12,7 @@ using HMI.Model.Module.Constants;
 using HMI.Model.Module.Messages;
 using HMI.Model.Module.BusinessEntities;
 using HMI.Model.Module.Properties;
-using NLog;
+using NLog;HoldTlfCall
 
 namespace HMI.Model.Module.Services
 {
